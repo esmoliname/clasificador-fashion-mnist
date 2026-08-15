@@ -97,6 +97,7 @@ def main() -> None:
     model = construir_modelo(INPUT_SHAPE)
     entrenar(model, x_train, y_train)
     evaluar(model, x_test, y_test)
+    model.save("modelo.keras")
 
 
 if __name__ == "__main__":

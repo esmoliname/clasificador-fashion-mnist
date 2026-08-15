@@ -25,7 +25,7 @@
 4. [Características Técnicas](#-características-técnicas)
 5. [DevSecOps & OWASP](#-devsecops--owasp)
 6. [Estructura del Proyecto](#-estructura-del-proyecto)
-7. [Despliegue y Ejecución Local](#-despliegue-y-ejecución-local)
+7. [Ejecución Local](#-ejecución-local)
 8. [Calidad y Seguridad](#-calidad-y-seguridad)
 
 ---
@@ -164,8 +164,12 @@ clasificador-fashion-mnist/
 ├── .github/
 │   └── workflows/
 │       └── ci.yml                  # Pipeline CI + auditoría de seguridad
+├── frontend/
+│   └── index.html                  # SPA Vue 3 + Tailwind + Axios (CDN, autocontenida)
 ├── src/
+│   ├── app.py                      # API REST FastAPI (inferencia del modelo)
 │   └── main.py                     # Clasificador Fashion MNIST (MLP)
+├── Dockerfile                      # Contenedor Docker opcional del backend
 ├── .gitignore                      # Excluye venv, datos y artefactos de entrenamiento
 ├── .pre-commit-config.yaml         # Hooks DevSecOps (Bandit, Black, Flake8...)
 ├── README.md                       # Documentación del proyecto
@@ -174,7 +178,7 @@ clasificador-fashion-mnist/
 
 ---
 
-## 📦 Despliegue y Ejecución Local
+## 💻 Ejecución Local
 
 ### 1. Clonar el repositorio
 
@@ -212,6 +216,30 @@ python src/main.py
 
 El script descarga el dataset oficial, normaliza los datos, entrena la MLP durante
 10 épocas y reporta pérdida y exactitud sobre el conjunto de prueba.
+
+### 6. Probar la aplicación localmente
+
+La aplicación se ejecuta en dos piezas: la API FastAPI (`src/app.py`, que expone
+`POST /predict`) y el cliente SPA Vue 3 (`frontend/index.html`).
+
+#### Levantar el backend
+
+En una terminal, dentro de la carpeta del proyecto, ejecuta:
+
+```bash
+uvicorn src.app:app --host 0.0.0.0 --port 10000
+```
+
+La API quedará escuchando en `http://localhost:10000` y aceptará imágenes vía
+`multipart/form-data` en `POST /predict`.
+
+#### Usar la interfaz
+
+Haz **doble clic** en el archivo `frontend/index.html` para abrirlo en el navegador.
+El cliente ya está configurado para apuntar a `http://localhost:10000/predict`.
+
+Sube una foto de una prenda, presiona **🧠 Predecir prenda** y verás el Top 3 de
+clases con su probabilidad.
 
 ---
 
