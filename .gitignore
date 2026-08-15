@@ -10,3 +10,5 @@ saved_model/
 checkpoints/
 .ipynb_checkpoints/
 logs/
+.gradio/
+*.txt
