@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fashion MNIST — Clasificador Inteligente</title>
+
+  <!-- Tailwind CSS (Play CDN) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Vue 3 (Global Build) -->
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+
+  <!-- Axios -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Space Grotesk"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <style>
+    @keyframes float-slow {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(30px, -30px) scale(1.1); }
+    }
+    @keyframes spin-slow {
+      to { transform: rotate(360deg); }
+    }
+    .animate-float-slow { animation: float-slow 12s ease-in-out infinite; }
+    .animate-spin-slow { animation: spin-slow 2.4s linear infinite; }
+    .progress-bar {
+      transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .drop-zone-dragover {
+      border-color: rgba(129, 140, 248, 0.8) !important;
+      background: rgba(129, 140, 248, 0.08) !important;
+      transform: scale(1.01);
+    }
+  </style>
+</head>
+
+<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased overflow-x-hidden">
+
+  <!-- Fondo decorativo Glassmorphism -->
+  <div class="fixed inset-0 -z-10 pointer-events-none">
+    <div class="absolute inset-0 bg-gradient-to-br from-zinc-950 via-indigo-950/40 to-zinc-950"></div>
+    <div class="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-indigo-600/20 blur-3xl animate-float-slow"></div>
+    <div class="absolute top-1/3 -right-40 w-[28rem] h-[28rem] rounded-full bg-cyan-500/15 blur-3xl animate-float-slow" style="animation-delay: -6s;"></div>
+    <div class="absolute bottom-0 left-1/3 w-80 h-80 rounded-full bg-fuchsia-600/10 blur-3xl animate-float-slow" style="animation-delay: -3s;"></div>
+  </div>
+
+  <div id="app" class="flex flex-col items-center px-4 py-12 sm:py-16 min-h-screen" v-cloak>
+
+    <!-- Encabezado -->
+    <header class="text-center mb-10">
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-md text-xs text-indigo-300 tracking-widest uppercase mb-6">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        API conectada · Deep Learning
+      </div>
+      <h1 class="font-display text-4xl sm:text-5xl font-bold bg-gradient-to-r from-white via-indigo-200 to-cyan-200 bg-clip-text text-transparent">
+        Clasificador Fashion MNIST
+      </h1>
+      <p class="mt-4 text-zinc-400 max-w-lg mx-auto">
+        Sube una foto de una prenda de vestir. Una red neuronal analizará los tensores
+        y predecirá el tipo de ropa con confianza probabilística.
+      </p>
+    </header>
+
+    <!-- Tarjeta principal Glassmorphism -->
+    <main class="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/[0.06] backdrop-blur-2xl shadow-[0_8px_60px_rgba(0,0,0,0.6)] p-6 sm:p-8">
+
+      <!-- Zona Drag & Drop -->
+      <div
+        class="drop-zone relative rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.03] hover:border-indigo-400/60 hover:bg-indigo-500/5 transition-all duration-300 cursor-pointer overflow-hidden"
+        :class="{ 'drop-zone-dragover': dragging }"
+        @click="abrirSelector"
+        @dragover.prevent="dragging = true"
+        @dragleave.prevent="dragging = false"
+        @drop.prevent="manejarDrop"
+      >
+        <!-- Vista previa de la imagen -->
+        <div v-if="imagen" class="relative flex items-center justify-center p-6">
+          <img :src="previewURL" alt="Vista previa" class="max-h-72 rounded-xl shadow-2xl ring-1 ring-white/10" />
+          <button
+            @click.stop="limpiarImagen"
+            class="absolute top-3 right-3 w-8 h-8 rounded-full bg-zinc-900/80 border border-white/10 text-zinc-300 hover:bg-red-500/80 hover:text-white transition-all text-sm"
+            title="Quitar imagen"
+          >✕</button>
+          <p class="absolute bottom-3 left-0 right-0 text-center text-xs text-zinc-400">Haz clic o arrastra otra imagen para reemplazarla</p>
+        </div>
+
+        <!-- Estado vacío -->
+        <div v-else class="flex flex-col items-center justify-center py-16 px-6 text-center">
+          <div class="w-16 h-16 mb-5 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 border border-white/10 flex items-center justify-center">
+            <svg class="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21zM8.25 7.5h.008v.008H8.25V7.5z" />
+            </svg>
+          </div>
+          <p class="font-medium text-zinc-200">Arrastra y suelta tu imagen aquí</p>
+          <p class="mt-1 text-sm text-zinc-500">o haz clic para buscarla en tu dispositivo</p>
+          <p class="mt-4 text-[11px] text-zinc-600">PNG · JPG · WEBP — máx. 5 MB</p>
+        </div>
+
+        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="manejarArchivo" />
+      </div>
+
+      <!-- Botón Predecir -->
+      <div class="mt-6">
+        <button
+          @click="predecir"
+          :disabled="!imagen || cargando"
+          class="w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-300
+                 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-lg shadow-indigo-900/40
+                 hover:shadow-indigo-600/40 hover:brightness-110 active:scale-[0.99]
+                 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
+        >
+          <span v-if="cargando" class="inline-flex items-center gap-2">
+            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+            </svg>
+            Analizando tensores…
+          </span>
+          <span v-else>🧠 Predecir prenda</span>
+        </button>
+      </div>
+
+      <!-- Mensaje de error -->
+      <div v-if="error" class="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 backdrop-blur px-4 py-3 text-sm text-red-300 flex items-start gap-2">
+        <span>⚠️</span>
+        <span>{{ error }}</span>
+      </div>
+
+      <!-- Resultados: Top 3 con barras de progreso animadas -->
+      <div v-if="resultados.length" class="mt-8">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-zinc-300 tracking-widest uppercase">Predicciones</h2>
+          <span class="text-xs text-zinc-500">Top 3 de 10 clases</span>
+        </div>
+
+        <div v-for="(r, i) in resultados" :key="r.clase" class="mb-4">
+          <div class="flex items-center justify-between mb-1.5 text-sm">
+            <span class="flex items-center gap-2">
+              <span
+                class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold"
+                :class="['bg-indigo-500/20 text-indigo-300', 'bg-cyan-500/20 text-cyan-300', 'bg-fuchsia-500/20 text-fuchsia-300'][i]"
+              >{{ i + 1 }}</span>
+              <span class="text-zinc-200 font-medium">{{ r.clase }}</span>
+            </span>
+            <span class="font-mono text-zinc-400">{{ (r.probabilidad * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="h-2.5 rounded-full bg-white/5 overflow-hidden">
+            <div
+              class="progress-bar h-full rounded-full"
+              :class="['bg-gradient-to-r from-indigo-500 to-indigo-400', 'bg-gradient-to-r from-cyan-500 to-cyan-400', 'bg-gradient-to-r from-fuchsia-500 to-fuchsia-400'][i]"
+              :style="{ width: (r.probabilidad * 100).toFixed(1) + '%' }"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Predicción principal destacada -->
+        <div class="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.07] px-5 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-[11px] uppercase tracking-widest text-emerald-400/80">Predicción principal</p>
+            <p class="text-lg font-bold text-emerald-300">{{ prediccionPrincipal }}</p>
+          </div>
+          <p class="text-2xl font-display font-bold text-emerald-400">{{ (confianza * 100).toFixed(1) }}%</p>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="mt-10 text-center text-xs text-zinc-600">
+      <p>TensorFlow · Keras · FastAPI · Vue 3 · Tailwind CSS</p>
+      <p class="mt-1">Backend en Render · Frontend en Vercel</p>
+    </footer>
+  </div>
+
+  <script>
+    const { createApp, ref, computed } = Vue;
+
+    createApp({
+      setup() {
+        const imagen = ref(null);        // File de la imagen seleccionada
+        const previewURL = ref(null);    // URL de objeto para la vista previa
+        const cargando = ref(false);     // Estado de la petición
+        const resultados = ref([]);      // Top 3 devuelto por la API
+        const error = ref(null);         // Mensaje de error
+        const dragging = ref(false);     // Estado Drag & Drop
+        const fileInput = ref(null);
+
+        // TODO: En producción, reemplazar por la URL de Render:
+        // const API_URL = 'https://tu-app-backend.onrender.com/predict';
+        const API_URL = 'http://localhost:10000/predict';
+
+        const prediccionPrincipal = computed(() => resultados.value[0]?.clase ?? '');
+        const confianza = computed(() => resultados.value[0]?.probabilidad ?? 0);
+
+        function abrirSelector() {
+          if (cargando.value) return;
+          fileInput.value.click();
+        }
+
+        function manejarArchivo(evento) {
+          const archivo = evento.target.files[0];
+          if (archivo) setImagen(archivo);
+          evento.target.value = '';
+        }
+
+        function manejarDrop(evento) {
+          dragging.value = false;
+          const archivo = evento.dataTransfer.files[0];
+          if (archivo) setImagen(archivo);
+        }
+
+        function setImagen(archivo) {
+          if (!archivo.type.startsWith('image/')) {
+            error.value = 'El archivo seleccionado no es una imagen válida.';
+            return;
+          }
+          if (archivo.size > 5 * 1024 * 1024) {
+            error.value = 'La imagen supera el tamaño máximo de 5 MB.';
+            return;
+          }
+          error.value = null;
+          resultados.value = [];
+          imagen.value = archivo;
+          if (previewURL.value) URL.revokeObjectURL(previewURL.value);
+          previewURL.value = URL.createObjectURL(archivo);
+        }
+
+        function limpiarImagen() {
+          imagen.value = null;
+          if (previewURL.value) URL.revokeObjectURL(previewURL.value);
+          previewURL.value = null;
+          resultados.value = [];
+          error.value = null;
+        }
+
+        async function predecir() {
+          if (!imagen.value || cargando.value) return;
+          cargando.value = true;
+          error.value = null;
+
+          const formData = new FormData();
+          formData.append('file', imagen.value);
+
+          try {
+            const { data } = await axios.post(API_URL, formData, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            resultados.value = data.resultados.slice(0, 3);
+          } catch (e) {
+            error.value = e.response?.data?.detail
+              || 'No se pudo conectar con la API. Verifica que el backend esté activo.';
+          } finally {
+            cargando.value = false;
+          }
+        }
+
+        return {
+          imagen, previewURL, cargando, resultados, error, dragging, fileInput,
+          prediccionPrincipal, confianza,
+          abrirSelector, manejarArchivo, manejarDrop, limpiarImagen, predecir,
+        };
+      },
+    }).mount('#app');
+  </script>
+</body>
+</html>
