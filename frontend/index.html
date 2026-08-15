@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Fashion MNIST — Clasificador Inteligente</title>
+  <title>Tensor Analysis Dashboard — Fashion MNIST</title>
 
   <!-- Tailwind CSS (Play CDN) -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -32,168 +32,353 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
   <style>
-    @keyframes float-slow {
-      0%, 100% { transform: translate(0, 0) scale(1); }
-      50% { transform: translate(30px, -30px) scale(1.1); }
+    /* ── Blueprint / lab grid background ─────────────────────────── */
+    .cyber-grid {
+      background-image:
+        linear-gradient(rgba(34, 211, 238, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(34, 211, 238, 0.045) 1px, transparent 1px);
+      background-size: 42px 42px;
+      -webkit-mask-image: radial-gradient(ellipse 90% 80% at 50% 20%, black 40%, transparent 100%);
+      mask-image: radial-gradient(ellipse 90% 80% at 50% 20%, black 40%, transparent 100%);
     }
-    @keyframes spin-slow {
-      to { transform: rotate(360deg); }
+    .cyber-vignette {
+      background:
+        radial-gradient(ellipse 60% 45% at 50% -5%, rgba(34, 211, 238, 0.10), transparent 70%),
+        radial-gradient(ellipse 50% 40% at 85% 100%, rgba(16, 185, 129, 0.05), transparent 70%);
     }
-    .animate-float-slow { animation: float-slow 12s ease-in-out infinite; }
-    .animate-spin-slow { animation: spin-slow 2.4s linear infinite; }
-    .progress-bar {
-      transition: width 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* ── Panel glassmorphism con borde fino ──────────────────────── */
+    .panel {
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid rgba(30, 41, 59, 1);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: inset 0 1px 0 rgba(148, 163, 184, 0.06), 0 20px 60px rgba(0, 0, 0, 0.55);
     }
-    .drop-zone-dragover {
-      border-color: rgba(129, 140, 248, 0.8) !important;
-      background: rgba(129, 140, 248, 0.08) !important;
-      transform: scale(1.01);
+    .panel-tag {
+      letter-spacing: 0.28em;
     }
+
+    /* ── Escaneo holográfico sobre la imagen ─────────────────────── */
+    @keyframes scan {
+      0%   { top: 0%;    opacity: 0; }
+      8%   { opacity: 1; }
+      92%  { opacity: 1; }
+      100% { top: 100%;  opacity: 0; }
+    }
+    .scan-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      top: 0;
+      background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.9), transparent);
+      box-shadow: 0 0 14px rgba(34, 211, 238, 0.7), 0 0 32px rgba(34, 211, 238, 0.35);
+      animation: scan 2.1s linear infinite;
+      pointer-events: none;
+    }
+
+    /* ── Marco esquinas (brackets) tipo HUD ──────────────────────── */
+    .corner {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      border-color: rgba(34, 211, 238, 0.7);
+      pointer-events: none;
+    }
+    .corner-tl { top: 6px;   left: 6px;   border-top: 1px solid; border-left: 1px solid; }
+    .corner-tr { top: 6px;   right: 6px;  border-top: 1px solid; border-right: 1px solid; }
+    .corner-bl { bottom: 6px; left: 6px;  border-bottom: 1px solid; border-left: 1px solid; }
+    .corner-br { bottom: 6px; right: 6px; border-bottom: 1px solid; border-right: 1px solid; }
+
+    /* ── Consola telemetría ──────────────────────────────────────── */
+    .console {
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid rgba(30, 41, 59, 1);
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+    }
+    @keyframes blink {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+    .cursor-blink { animation: blink 1s step-end infinite; }
+
+    /* ── Barras de probabilidad delgadas ─────────────────────────── */
+    .prob-track {
+      background: rgba(51, 65, 85, 0.25);
+      border: 1px solid rgba(51, 65, 85, 0.5);
+    }
+    @keyframes fillbar {
+      from { width: 0%; }
+    }
+    .prob-fill { animation: fillbar 0.9s cubic-bezier(0.22, 1, 0.36, 1); }
+
+    .glow-cyan { text-shadow: 0 0 18px rgba(34, 211, 238, 0.55); }
+    .glow-emerald { text-shadow: 0 0 18px rgba(52, 211, 153, 0.55); }
   </style>
 </head>
 
-<body class="min-h-screen bg-zinc-950 text-zinc-100 antialiased overflow-x-hidden">
+<body class="min-h-screen bg-slate-950 text-slate-200 antialiased overflow-x-hidden">
 
-  <!-- Fondo decorativo Glassmorphism -->
+  <!-- Fondo científico: rejilla de blueprint + viñeta -->
   <div class="fixed inset-0 -z-10 pointer-events-none">
-    <div class="absolute inset-0 bg-gradient-to-br from-zinc-950 via-indigo-950/40 to-zinc-950"></div>
-    <div class="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-indigo-600/20 blur-3xl animate-float-slow"></div>
-    <div class="absolute top-1/3 -right-40 w-[28rem] h-[28rem] rounded-full bg-cyan-500/15 blur-3xl animate-float-slow" style="animation-delay: -6s;"></div>
-    <div class="absolute bottom-0 left-1/3 w-80 h-80 rounded-full bg-fuchsia-600/10 blur-3xl animate-float-slow" style="animation-delay: -3s;"></div>
+    <div class="absolute inset-0 cyber-grid"></div>
+    <div class="absolute inset-0 cyber-vignette"></div>
   </div>
 
-  <div id="app" class="flex flex-col items-center px-4 py-12 sm:py-16 min-h-screen" v-cloak>
+  <div id="app" class="flex flex-col items-center px-4 py-8 sm:py-12 min-h-screen" v-cloak>
 
-    <!-- Encabezado -->
-    <header class="text-center mb-10">
-      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/10 bg-white/5 backdrop-blur-md text-xs text-indigo-300 tracking-widest uppercase mb-6">
-        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-        API conectada · Deep Learning
+    <!-- ═══ Barra superior HUD ═══ -->
+    <header class="w-full max-w-6xl mb-8">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-10 h-10 rounded-lg border border-cyan-400/30 bg-cyan-400/5 flex items-center justify-center shadow-[0_0_24px_rgba(34,211,238,0.25)]">
+            <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+            </svg>
+          </div>
+          <div>
+            <h1 class="font-display text-lg sm:text-xl font-bold text-white tracking-tight">
+              TENSOR ANALYSIS <span class="text-cyan-400">DASHBOARD</span>
+            </h1>
+            <p class="font-mono text-[11px] text-slate-500">fashion-mnist / mlp-784-50-50-10</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-2 font-mono text-[11px]">
+          <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-emerald-400/20 bg-emerald-400/5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-emerald-400">API // localhost:10000</span>
+          </span>
+          <span class="px-3 py-1.5 rounded-md border border-slate-800 text-slate-400 hidden sm:inline-block">MODEL: MLP</span>
+        </div>
       </div>
-      <h1 class="font-display text-4xl sm:text-5xl font-bold bg-gradient-to-r from-white via-indigo-200 to-cyan-200 bg-clip-text text-transparent">
-        Clasificador Fashion MNIST
-      </h1>
-      <p class="mt-4 text-zinc-400 max-w-lg mx-auto">
-        Sube una foto de una prenda de vestir. Una red neuronal analizará los tensores
-        y predecirá el tipo de ropa con confianza probabilística.
-      </p>
     </header>
 
-    <!-- Tarjeta principal Glassmorphism -->
-    <main class="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/[0.06] backdrop-blur-2xl shadow-[0_8px_60px_rgba(0,0,0,0.6)] p-6 sm:p-8">
+    <!-- ═══ Layout dividido: Input / Telemetría ═══ -->
+    <main class="w-full max-w-6xl grid lg:grid-cols-2 gap-5 items-start">
 
-      <!-- Zona Drag & Drop -->
-      <div
-        class="drop-zone relative rounded-2xl border-2 border-dashed border-white/15 bg-white/[0.03] hover:border-indigo-400/60 hover:bg-indigo-500/5 transition-all duration-300 cursor-pointer overflow-hidden"
-        :class="{ 'drop-zone-dragover': dragging }"
-        @click="abrirSelector"
-        @dragover.prevent="dragging = true"
-        @dragleave.prevent="dragging = false"
-        @drop.prevent="manejarDrop"
-      >
-        <!-- Vista previa de la imagen -->
-        <div v-if="imagen" class="relative flex items-center justify-center p-6">
-          <img :src="previewURL" alt="Vista previa" class="max-h-72 rounded-xl shadow-2xl ring-1 ring-white/10" />
-          <button
-            @click.stop="limpiarImagen"
-            class="absolute top-3 right-3 w-8 h-8 rounded-full bg-zinc-900/80 border border-white/10 text-zinc-300 hover:bg-red-500/80 hover:text-white transition-all text-sm"
-            title="Quitar imagen"
-          >✕</button>
-          <p class="absolute bottom-3 left-0 right-0 text-center text-xs text-zinc-400">Haz clic o arrastra otra imagen para reemplazarla</p>
-        </div>
-
-        <!-- Estado vacío -->
-        <div v-else class="flex flex-col items-center justify-center py-16 px-6 text-center">
-          <div class="w-16 h-16 mb-5 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-cyan-500/20 border border-white/10 flex items-center justify-center">
-            <svg class="w-8 h-8 text-indigo-300" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21zM8.25 7.5h.008v.008H8.25V7.5z" />
-            </svg>
-          </div>
-          <p class="font-medium text-zinc-200">Arrastra y suelta tu imagen aquí</p>
-          <p class="mt-1 text-sm text-zinc-500">o haz clic para buscarla en tu dispositivo</p>
-          <p class="mt-4 text-[11px] text-zinc-600">PNG · JPG · WEBP — máx. 5 MB</p>
-        </div>
-
-        <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="manejarArchivo" />
-      </div>
-
-      <!-- Botón Predecir -->
-      <div class="mt-6">
-        <button
-          @click="predecir"
-          :disabled="!imagen || cargando"
-          class="w-full py-3.5 rounded-xl font-semibold text-sm tracking-wide transition-all duration-300
-                 bg-gradient-to-r from-indigo-500 to-cyan-500 text-white shadow-lg shadow-indigo-900/40
-                 hover:shadow-indigo-600/40 hover:brightness-110 active:scale-[0.99]
-                 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
-        >
-          <span v-if="cargando" class="inline-flex items-center gap-2">
-            <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-            </svg>
-            Analizando tensores…
-          </span>
-          <span v-else>🧠 Predecir prenda</span>
-        </button>
-      </div>
-
-      <!-- Mensaje de error -->
-      <div v-if="error" class="mt-5 rounded-xl border border-red-500/30 bg-red-500/10 backdrop-blur px-4 py-3 text-sm text-red-300 flex items-start gap-2">
-        <span>⚠️</span>
-        <span>{{ error }}</span>
-      </div>
-
-      <!-- Resultados: Top 3 con barras de progreso animadas -->
-      <div v-if="resultados.length" class="mt-8">
+      <!-- ─── PANEL IZQUIERDO · INPUT ─── -->
+      <section class="panel rounded-2xl p-5 sm:p-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-sm font-semibold text-zinc-300 tracking-widest uppercase">Predicciones</h2>
-          <span class="text-xs text-zinc-500">Top 3 de 10 clases</span>
+          <h2 class="panel-tag font-display text-[11px] font-semibold text-slate-400 uppercase">
+            <span class="text-cyan-400">▸</span> Input
+          </h2>
+          <span class="font-mono text-[10px] text-slate-600" v-if="imagen">{{ formato }} · {{ tamaño }}</span>
         </div>
 
-        <div v-for="(r, i) in resultados" :key="r.clase" class="mb-4">
-          <div class="flex items-center justify-between mb-1.5 text-sm">
-            <span class="flex items-center gap-2">
-              <span
-                class="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold"
-                :class="['bg-indigo-500/20 text-indigo-300', 'bg-cyan-500/20 text-cyan-300', 'bg-fuchsia-500/20 text-fuchsia-300'][i]"
-              >{{ i + 1 }}</span>
-              <span class="text-zinc-200 font-medium">{{ r.clase }}</span>
+        <!-- Zona de análisis con marco HUD -->
+        <div class="relative">
+          <div
+            class="relative rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/40 overflow-hidden cursor-pointer transition-all duration-300"
+            :class="dragging ? 'border-cyan-400 bg-cyan-400/5 shadow-[0_0_40px_rgba(34,211,238,0.25)]' : 'hover:border-cyan-400/50'"
+            @click="abrirSelector"
+            @dragover.prevent="dragging = true"
+            @dragleave.prevent="dragging = false"
+            @drop.prevent="manejarDrop"
+          >
+            <!-- Imagen cargada con escaneo holográfico -->
+            <div v-if="imagen" class="relative flex items-center justify-center p-6">
+              <img :src="previewURL" alt="Vista previa del tensor de entrada" class="max-h-72 rounded-lg shadow-2xl ring-1 ring-slate-700" />
+              <div class="scan-line" :class="cargando ? '' : 'opacity-0'"></div>
+              <span class="corner corner-tl"></span>
+              <span class="corner corner-tr"></span>
+              <span class="corner corner-bl"></span>
+              <span class="corner corner-br"></span>
+              <div v-if="cargando" class="absolute bottom-5 left-0 right-0 text-center font-mono text-[10px] text-cyan-400/80 tracking-widest uppercase glow-cyan">
+                ▸ escaneando tensor 28x28…
+              </div>
+              <button
+                @click.stop="limpiarImagen"
+                class="absolute top-3 right-3 w-8 h-8 rounded-md bg-slate-900/80 border border-slate-700 text-slate-400 hover:text-red-400 hover:border-red-400/50 transition-all text-sm"
+                title="Descartar imagen"
+              >✕</button>
+            </div>
+
+            <!-- Estado vacío -->
+            <div v-else class="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <svg class="w-9 h-9 text-slate-600 mb-4" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A1.5 1.5 0 0021.75 19.5V4.5A1.5 1.5 0 0020.25 3H3.75A1.5 1.5 0 002.25 4.5v15A1.5 1.5 0 003.75 21zM8.25 7.5h.008v.008H8.25V7.5z" />
+              </svg>
+              <p class="font-display font-medium text-slate-300">Arrastra el tensor de entrada</p>
+              <p class="mt-1 text-sm text-slate-500">o haz clic para buscar en el dispositivo</p>
+              <p class="mt-4 font-mono text-[10px] text-slate-600">PNG · JPG · WEBP — máx 5 MB</p>
+            </div>
+
+            <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="manejarArchivo" />
+          </div>
+        </div>
+
+        <!-- Botón de análisis -->
+        <div class="mt-5">
+          <button
+            @click="predecir"
+            :disabled="!imagen || cargando"
+            class="w-full py-3 rounded-lg font-display font-semibold text-sm tracking-[0.2em] uppercase transition-all duration-300
+                   bg-cyan-400/10 border border-cyan-400/40 text-cyan-300
+                   hover:bg-cyan-400/20 hover:shadow-[0_0_30px_rgba(34,211,238,0.3)]
+                   disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none"
+          >
+            <span v-if="cargando" class="inline-flex items-center gap-2 font-mono normal-case tracking-normal">
+              <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+              </svg>
+              procesando…
             </span>
-            <span class="font-mono text-zinc-400">{{ (r.probabilidad * 100).toFixed(1) }}%</span>
+            <span v-else>⚡ Analizar tensor</span>
+          </button>
+        </div>
+
+        <!-- Error de conexión -->
+        <div v-if="error" class="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 font-mono text-xs text-red-400 flex items-start gap-2">
+          <span class="mt-px">⚠</span>
+          <span>{{ error }}</span>
+        </div>
+      </section>
+
+      <!-- ─── PANEL DERECHO · TELEMETRÍA ─── -->
+      <section class="panel rounded-2xl p-5 sm:p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="panel-tag font-display text-[11px] font-semibold text-slate-400 uppercase">
+            <span class="text-cyan-400">▸</span> Telemetry
+          </h2>
+          <span class="font-mono text-[10px] text-slate-600">{{ cargando ? 'RUNNING' : (resultados.length ? 'COMPLETE' : 'IDLE') }}</span>
+        </div>
+
+        <!-- Consola de ejecución -->
+        <div class="console rounded-lg p-4 h-48 overflow-y-auto">
+          <div v-for="(l, i) in telemetry" :key="i" class="font-mono text-[11px] leading-6 truncate">
+            <span class="text-slate-600">› </span>
+            <span :class="l.nivel === 'ok' ? 'text-emerald-400' : (l.nivel === 'err' ? 'text-red-400' : 'text-slate-400')">{{ l.msg }}</span>
           </div>
-          <div class="h-2.5 rounded-full bg-white/5 overflow-hidden">
-            <div
-              class="progress-bar h-full rounded-full"
-              :class="['bg-gradient-to-r from-indigo-500 to-indigo-400', 'bg-gradient-to-r from-cyan-500 to-cyan-400', 'bg-gradient-to-r from-fuchsia-500 to-fuchsia-400'][i]"
-              :style="{ width: (r.probabilidad * 100).toFixed(1) + '%' }"
-            ></div>
+          <div v-if="cargando" class="font-mono text-[11px] leading-6 text-cyan-400 glow-cyan">
+            ▊<span class="cursor-blink">▊</span>
+          </div>
+          <div v-if="!telemetry.length && !cargando" class="font-mono text-[11px] leading-6 text-slate-700">
+            ▸ esperando tensor de entrada…
           </div>
         </div>
 
-        <!-- Predicción principal destacada -->
-        <div class="mt-6 rounded-2xl border border-emerald-500/20 bg-emerald-500/[0.07] px-5 py-4 flex items-center justify-between">
-          <div>
-            <p class="text-[11px] uppercase tracking-widest text-emerald-400/80">Predicción principal</p>
-            <p class="text-lg font-bold text-emerald-300">{{ prediccionPrincipal }}</p>
+        <!-- Resultados: Top 3 de probabilidades -->
+        <div v-if="resultados.length" class="mt-6">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="panel-tag font-display text-[10px] font-semibold text-slate-500 uppercase">Distribución softmax</h3>
+            <span class="font-mono text-[10px] text-slate-600">top-3 / 10 clases</span>
           </div>
-          <p class="text-2xl font-display font-bold text-emerald-400">{{ (confianza * 100).toFixed(1) }}%</p>
-        </div>
-      </div>
 
+          <div v-for="(r, i) in resultados" :key="r.clase" class="mb-3">
+            <div class="flex items-center justify-between gap-3 mb-1">
+              <span class="flex items-center gap-2 min-w-0">
+                <span
+                  class="w-5 h-5 shrink-0 rounded flex items-center justify-center font-mono text-[10px] font-bold border"
+                  :class="['border-cyan-400/40 text-cyan-400', 'border-slate-600 text-slate-400', 'border-slate-700 text-slate-500'][i]"
+                >{{ i + 1 }}</span>
+                <span class="text-sm text-slate-300 truncate">{{ r.clase }}</span>
+              </span>
+              <span class="font-mono text-[11px] font-semibold" :class="i === 0 ? 'text-emerald-400 glow-emerald' : 'text-slate-500'">
+                {{ (r.probabilidad * 100).toFixed(2) }}%
+              </span>
+            </div>
+            <div class="prob-track h-1 rounded-full overflow-hidden">
+              <div
+                class="prob-fill h-full rounded-full"
+                :class="['bg-gradient-to-r from-cyan-500 to-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.6)]', 'bg-slate-600', 'bg-slate-700'][i]"
+                :style="{ width: (r.probabilidad * 100).toFixed(2) + '%' }"
+              ></div>
+            </div>
+          </div>
+
+          <!-- Verdicto principal -->
+          <div class="mt-5 rounded-lg border border-emerald-400/20 bg-emerald-400/5 px-4 py-3 flex items-center justify-between">
+            <div>
+              <p class="panel-tag font-display text-[9px] uppercase tracking-widest text-emerald-400/70">Veredicto</p>
+              <p class="font-display text-base font-bold text-emerald-300">{{ prediccionPrincipal }}</p>
+            </div>
+            <div class="text-right">
+              <p class="font-mono text-xl font-bold text-emerald-400 glow-emerald">{{ (confianza * 100).toFixed(2) }}%</p>
+              <p class="font-mono text-[9px] text-slate-500">confianza</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Placeholder sin resultados -->
+        <div v-else-if="!cargando" class="mt-6 rounded-lg border border-slate-800/80 px-4 py-5 text-center">
+          <p class="font-mono text-[11px] text-slate-600">// sin salida del modelo — esperando análisis</p>
+        </div>
+      </section>
     </main>
 
     <!-- Footer -->
-    <footer class="mt-10 text-center text-xs text-zinc-600">
-      <p>TensorFlow · Keras · FastAPI · Vue 3 · Tailwind CSS</p>
-      <p class="mt-1">Backend en Render · Frontend en Vercel</p>
+    <footer class="mt-10 text-center font-mono text-[10px] text-slate-700">
+      <p>tensorflow · keras · fastapi · vue3 · tailwind</p>
+      <p class="mt-1">inferencia local — http://localhost:10000/predict</p>
     </footer>
   </div>
 
   <script>
-    const { createApp, ref, computed } = Vue;
+    const { createApp, ref, computed, defineComponent } = Vue;
 
+    // ── Constantes del entorno ─────────────────────────────────────
+    const API_URL = 'http://localhost:10000/predict';
+
+    const PROCESANDO = [
+      'Buffer de imagen recibido → canal RGB',
+      'Redimensionando a 28x28 píxeles…',
+      'Normalizando píxeles a [0,1]…',
+      'Calculando tensores de entrada…',
+      'Extrayendo características (784 dims)…',
+      'Propagando MLP 50-50-10 (ReLU)…',
+      'Aplicando softmax en la capa de salida…',
+      'Consolidando distribuciones…',
+    ];
+
+    function etiquetaHora() {
+      return new Date().toLocaleTimeString('es-ES', { hour12: false });
+    }
+
+    function tamañoLegible(bytes) {
+      if (!bytes) return '';
+      const kb = bytes / 1024;
+      return kb >= 1024 ? (kb / 1024).toFixed(2) + ' MB' : kb.toFixed(0) + ' KB';
+    }
+
+    // ── Componentes internos ───────────────────────────────────────
+    const LineaConsola = defineComponent({
+      props: { nivel: String, msg: String },
+      template: `
+        <div class="font-mono text-[11px] leading-6 truncate">
+          <span class="text-slate-600">› </span>
+          <span :class="nivel === 'ok' ? 'text-emerald-400' : (nivel === 'err' ? 'text-red-400' : 'text-slate-400')">{{ msg }}</span>
+        </div>`,
+    });
+
+    const BarraProbabilidad = defineComponent({
+      props: { clase: String, probabilidad: Number, indice: Number },
+      template: `
+        <div class="mb-3">
+          <div class="flex items-center justify-between gap-3 mb-1">
+            <span class="flex items-center gap-2 min-w-0">
+              <span class="w-5 h-5 shrink-0 rounded flex items-center justify-center font-mono text-[10px] font-bold border"
+                    :class="['border-cyan-400/40 text-cyan-400', 'border-slate-600 text-slate-400', 'border-slate-700 text-slate-500'][indice]">{{ indice + 1 }}</span>
+              <span class="text-sm text-slate-300 truncate">{{ clase }}</span>
+            </span>
+            <span class="font-mono text-[11px] font-semibold" :class="indice === 0 ? 'text-emerald-400' : 'text-slate-500'">
+              {{ (probabilidad * 100).toFixed(2) }}%
+            </span>
+          </div>
+          <div class="prob-track h-1 rounded-full overflow-hidden">
+            <div class="prob-fill h-full rounded-full"
+                 :class="['bg-gradient-to-r from-cyan-500 to-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.6)]', 'bg-slate-600', 'bg-slate-700'][indice]"
+                 :style="{ width: (probabilidad * 100).toFixed(2) + '%' }"></div>
+          </div>
+        </div>`,
+    });
+
+    // ── Aplicación principal ───────────────────────────────────────
     createApp({
+      components: { LineaConsola, BarraProbabilidad },
+
       setup() {
         const imagen = ref(null);        // File de la imagen seleccionada
         const previewURL = ref(null);    // URL de objeto para la vista previa
@@ -201,14 +386,33 @@
         const resultados = ref([]);      // Top 3 devuelto por la API
         const error = ref(null);         // Mensaje de error
         const dragging = ref(false);     // Estado Drag & Drop
+        const telemetry = ref([]);       // Líneas de la consola
         const fileInput = ref(null);
+        let intervaloTelemetria = null;
 
-        // TODO: En producción, reemplazar por la URL de Render:
-        // const API_URL = 'https://tu-app-backend.onrender.com/predict';
-        const API_URL = 'http://localhost:10000/predict';
-
+        const formato = computed(() => (imagen.value?.type || '').split('/')[1]?.toUpperCase() ?? '');
+        const tamaño = computed(() => tamañoLegible(imagen.value?.size));
         const prediccionPrincipal = computed(() => resultados.value[0]?.clase ?? '');
         const confianza = computed(() => resultados.value[0]?.probabilidad ?? 0);
+
+        function log(nivel, msg) {
+          telemetry.value.push({ nivel, msg: `[${etiquetaHora()}] ${msg}` });
+          if (telemetry.value.length > 14) telemetry.value.shift();
+        }
+
+        function iniciarProcesamiento() {
+          log('info', 'Analizando tensor de entrada…');
+          let i = 0;
+          intervaloTelemetria = setInterval(() => {
+            log('info', PROCESANDO[i % PROCESANDO.length]);
+            i += 1;
+          }, 450);
+        }
+
+        function detenerProcesamiento() {
+          if (intervaloTelemetria) clearInterval(intervaloTelemetria);
+          intervaloTelemetria = null;
+        }
 
         function abrirSelector() {
           if (cargando.value) return;
@@ -241,20 +445,25 @@
           imagen.value = archivo;
           if (previewURL.value) URL.revokeObjectURL(previewURL.value);
           previewURL.value = URL.createObjectURL(archivo);
+          log('info', `Tensor cargado: ${archivo.name} (${tamañoLegible(archivo.size)})`);
         }
 
         function limpiarImagen() {
+          detenerProcesamiento();
           imagen.value = null;
           if (previewURL.value) URL.revokeObjectURL(previewURL.value);
           previewURL.value = null;
           resultados.value = [];
           error.value = null;
+          telemetry.value = [];
         }
 
         async function predecir() {
           if (!imagen.value || cargando.value) return;
           cargando.value = true;
           error.value = null;
+          resultados.value = [];
+          iniciarProcesamiento();
 
           const formData = new FormData();
           formData.append('file', imagen.value);
@@ -264,17 +473,21 @@
               headers: { 'Content-Type': 'multipart/form-data' },
             });
             resultados.value = data.resultados.slice(0, 3);
+            detenerProcesamiento();
+            log('ok', `Análisis completado → ${data.resultados[0]?.clase ?? 'desconocido'} @ ${(data.resultados[0]?.probabilidad * 100).toFixed(2)}%`);
           } catch (e) {
+            detenerProcesamiento();
             error.value = e.response?.data?.detail
               || 'No se pudo conectar con la API. Verifica que el backend esté activo.';
+            log('err', `Error de conexión → ${error.value}`);
           } finally {
             cargando.value = false;
           }
         }
 
         return {
-          imagen, previewURL, cargando, resultados, error, dragging, fileInput,
-          prediccionPrincipal, confianza,
+          imagen, previewURL, cargando, resultados, error, dragging, telemetry, fileInput,
+          formato, tamaño, prediccionPrincipal, confianza,
           abrirSelector, manejarArchivo, manejarDrop, limpiarImagen, predecir,
         };
       },
