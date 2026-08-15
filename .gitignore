@@ -1,0 +1,12 @@
+venv/
+env/
+.env
+__pycache__/
+*.pyc
+/data/
+*.h5
+*.pb
+saved_model/
+checkpoints/
+.ipynb_checkpoints/
+logs/
