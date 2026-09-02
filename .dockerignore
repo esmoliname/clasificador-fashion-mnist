@@ -1,0 +1,16 @@
+.git
+.github
+tests
+frontend
+logs
+*.md
+__pycache__
+*.pyc
+.pytest_cache
+.mypy_cache
+.coverage
+htmlcov
+.venv
+venv
+.gitignore
+.pre-commit-config.yaml
