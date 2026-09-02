@@ -1,7 +1,7 @@
 # Framework (bump: 0.104.1 de 2023 no compatibiliza TestClient con httpx 0.28 en Python 3.13)
 fastapi==0.115.12
 uvicorn==0.24.0
-python-multipart==0.0.6
+python-multipart==0.0.31
 # Pillow 10.1.0 no tiene wheels para CPython 3.13; 12.3.0 es la actualización que propone Dependabot
 Pillow==12.3.0
 tensorflow==2.21.0
