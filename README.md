@@ -7,8 +7,8 @@
 ![Banner](https://via.placeholder.com/1000x250/09090b/ffffff.png?text=Fashion+MNIST+Deep+Learning+Classifier)
 
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.21.0-FF6F00?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
-[![Python](https://img.shields.io/badge/Python-3.13-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![CI](https://img.shields.io/github/actions/workflow/status/esmoliname/clasificador-fashion-mnist/ci.yml?branch=master&label=GitHub%20Actions&logo=githubactions&logoColor=white)](https://github.com/esmoliname/clasificador-fashion-mnist/actions)
+[![Python](https://img.shields.io/badge/Python-3.11%7C3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![CI](https://img.shields.io/github/actions/workflow/status/esmoliname/clasificador-fashion-mnist/ci.yml?branch=main&label=GitHub%20Actions&logo=githubactions&logoColor=white)](https://github.com/esmoliname/clasificador-fashion-mnist/actions)
 [![Code Style](https://img.shields.io/badge/code%20style-Black-000000.svg?logo=black&logoColor=white)](https://github.com/psf/black)
 [![Security](https://img.shields.io/badge/security-Bandit%20OWASP-49A882?logo=owasp&logoColor=white)](https://bandit.readthedocs.io/)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
@@ -65,8 +65,8 @@ flowchart LR
 
     subgraph RED["Red Neuronal MLP"]
         F["Flatten<br/>(784 neuronas)"]
-        D1["Dense 50<br/>activación ReLU"]
-        D2["Dense 50<br/>activación ReLU"]
+        D1["Dense 128<br/>activación ReLU"]
+        Dr["Dropout 0.2"]
     end
 
     subgraph SALIDA["Salida"]
@@ -74,14 +74,14 @@ flowchart LR
         P["Clase predicha<br/>(10 prendas)"]
     end
 
-    I --> F --> D1 --> D2 --> S --> P
+    I --> F --> D1 --> Dr --> S --> P
 
     classDef input fill:#0ea5e9,stroke:#0284c7,color:#fff
     classDef layer fill:#18181b,stroke:#38bdf8,color:#fff
     classDef output fill:#10b981,stroke:#059669,color:#fff
 
     class I input
-    class F,D1,D2 layer
+    class F,D1,Dr layer
     class S,P output
 ```
 
@@ -94,12 +94,15 @@ flowchart LR
 | Aspecto | Detalle |
 |---------|---------|
 | **Framework** | TensorFlow 2.21.0 + Keras 3 |
-| **Arquitectura** | MLP: `Flatten` → `Dense` → `Dense` → `Softmax` |
+| **Arquitectura** | MLP: `Flatten (784)` → `Dense 128 (ReLU)` → `Dropout 0.2` → `Dense 10 (Softmax)` |
 | **Optimizador** | Adam |
 | **Pérdida** | `sparse_categorical_crossentropy` |
 | **Métrica** | Exactitud (`accuracy`) |
 | **Épocas / Batch** | 10 / 32 |
 | **Validación** | `validation_split` del 20 % |
+| **Callbacks** | `EarlyStopping` (paciencia 3), `ReduceLROnPlateau` (paciencia 2), `ModelCheckpoint` (mejor `val_loss`) |
+| **Reproducibilidad** | Semilla fija `SEED = 42` (Python, NumPy y TensorFlow) |
+| **Clases** | `CLASS_NAMES` centralizado en `src/constants.py` (única fuente de verdad para la API) |
 | **Preprocesado** | Normalización de píxeles a [0, 1] (validación de entrada — OWASP A01) |
 | **Tipado** | `TypeAlias` + anotaciones de tipos (`mypy --strict`) |
 
@@ -168,12 +171,20 @@ clasificador-fashion-mnist/
 │   └── index.html                  # SPA Vue 3 + Tailwind + Axios (CDN, autocontenida)
 ├── src/
 │   ├── app.py                      # API REST FastAPI (inferencia del modelo)
+│   ├── constants.py                # Constantes canónicas: clases, arquitectura, seed, límites
+│   ├── schemas.py                  # Contratos Pydantic (PredictResponse, HealthResponse)
+│   ├── evaluate.py                 # Evaluación detallada (reporte + matriz de confusión)
 │   └── main.py                     # Clasificador Fashion MNIST (MLP)
+├── tests/                          # Suite de pruebas (pytest)
 ├── Dockerfile                      # Contenedor Docker opcional del backend
+├── .dockerignore                   # Excluye artefactos del build Docker
+├── .flake8                         # Configuración de linting (Flake8)
 ├── .gitignore                      # Excluye venv, datos y artefactos de entrenamiento
 ├── .pre-commit-config.yaml         # Hooks DevSecOps (Bandit, Black, Flake8...)
+├── pyproject.toml                  # Configuración del proyecto (mypy, tooling)
 ├── README.md                       # Documentación del proyecto
-└── requirements.txt                # Dependencias fijadas exactamente (reproducibilidad)
+├── requirements.txt                # Dependencias fijadas exactamente (reproducibilidad)
+└── requirements-dev.txt            # Dependencias de desarrollo (tests, linting)
 ```
 
 ---
@@ -200,6 +211,7 @@ venv\Scripts\activate          # Windows (PowerShell)
 ```bash
 python -m pip install --upgrade pip
 pip install -r requirements.txt
+pip install -r requirements-dev.txt   # dependencias de desarrollo: tests y linting
 ```
 
 ### 4. Instalar los hooks de seguridad
@@ -214,8 +226,15 @@ pre-commit install
 python src/main.py
 ```
 
-El script descarga el dataset oficial, normaliza los datos, entrena la MLP durante
-10 épocas y reporta pérdida y exactitud sobre el conjunto de prueba.
+El script descarga el dataset oficial, normaliza los datos y entrena la MLP
+durante 10 épocas con callbacks de control de calidad (`EarlyStopping`,
+`ReduceLROnPlateau`, `ModelCheckpoint`). Al terminar genera en `logs/`:
+
+- `training_history.json` — pérdida y exactitud por época (train/validación)
+- `classification_report.txt` — reporte de clasificación sobre el conjunto de prueba
+- `confusion_matrix.csv` — matriz de confusión exportada
+
+También guarda el modelo final en `modelo.keras` (raíz del repositorio).
 
 ### 6. Probar la aplicación localmente
 
@@ -230,15 +249,50 @@ En una terminal, dentro de la carpeta del proyecto, ejecuta:
 uvicorn src.app:app --host 0.0.0.0 --port 10000
 ```
 
-La API quedará escuchando en `http://localhost:10000` y aceptará imágenes vía
-`multipart/form-data` en `POST /predict`.
+La API quedará escuchando en `http://localhost:10000`.
+
+##### Contrato de la API
+
+| Endpoint | Descripción |
+|----------|-------------|
+| `POST /predict` | Clasifica una imagen enviada como `multipart/form-data` (campo `file`; máx. 5 MB; content-types permitidos: PNG, JPEG, WEBP, BMP, GIF). Devuelve un `PredictResponse`. |
+| `GET /health` | Healthcheck: devuelve un `HealthResponse` (`status`, `model_loaded`) sin llegar a lanzar excepción. |
+
+`PredictResponse` — los campos raíz contienen el **top-1**, y `resultados` las
+**10 clases** ordenadas de mayor a menor confianza:
+
+| Campo | Tipo | Descripción |
+|-------|------|-------------|
+| `class_id` | `int` | Índice de la clase top-1. |
+| `class_name` | `str` | Nombre de la clase top-1 (español, desde `CLASS_NAMES`). |
+| `confidence` | `float` | Confianza del top-1 (`[0, 1]`). |
+| `latency_ms` | `float` | Latencia de inferencia en milisegundos. |
+| `model_version` | `str` | Versión del modelo (`MODEL_VERSION = "1.0.0"`). |
+| `resultados` | `list[ClassProbability]` | 10 ítems `{class_id, class_name, confidence}` ordenados por confianza descendente. |
+
+##### Variables de entorno
+
+| Variable | Descripción | Default |
+|----------|-------------|---------|
+| `ALLOWED_ORIGINS` | Orígenes CORS permitidos, separados por comas. | `http://localhost:10000, http://127.0.0.1:10000` |
+| `MODEL_PATH` | Ruta del modelo `.keras` a cargar. | `modelo.keras` (raíz del repo) |
+| `PORT` | Puerto del servidor uvicorn dentro del contenedor Docker. | `10000` |
 
 #### Usar la interfaz
 
 Haz **doble clic** en el archivo `frontend/index.html` para abrirlo en el navegador.
-El cliente ya está configurado para apuntar a `http://localhost:10000/predict`.
+La URL del backend ya **no está hardcodeada**: el cliente la resuelve en tiempo de
+ejecución con esta prioridad:
 
-Sube una foto de una prenda, presiona **🧠 Predecir prenda** y verás el Top 3 de
+1. **Query param** `?api=<url>` (p. ej. `index.html?api=https://api.example.com/predict`).
+2. **Mismo origen**, si el frontend se sirve desde un host real (Vercel, proxy, etc.):
+   usa `<origen>/predict`.
+3. **`localStorage`**, clave `fmnist_api_url` (ajustable desde la consola del navegador).
+4. **Fallback de desarrollo**: `http://localhost:10000/predict`.
+
+El endpoint activo se muestra en el header (píldora `API // ...`) y en el footer.
+
+Sube una foto de una prenda, presiona **⚡ Analizar tensor** y verás el Top 3 de
 clases con su probabilidad.
 
 ---
@@ -253,6 +307,7 @@ flake8 src/                       # Estilo (PEP 8, máx. 88 columnas)
 mypy src/                         # Tipos estáticos
 pylint src/main.py                # Análisis estático
 bandit -r src/                    # Auditoría de seguridad (OWASP)
+pytest                            # Suite de pruebas (tests/)
 pre-commit run --all-files        # Todos los hooks DevSecOps
 ```
 
