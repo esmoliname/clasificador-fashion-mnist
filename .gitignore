@@ -1,14 +1,34 @@
+# Entornos virtuales
 venv/
 env/
-.env
+.venv/
+
+# Cache de Python / herramientas
 __pycache__/
 *.pyc
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.ipynb_checkpoints/
+
+# Datos de entrenamiento
 /data/
+
+# Modelos entrenados (artefactos, no fuentes)
 *.h5
 *.pb
 saved_model/
 checkpoints/
-.ipynb_checkpoints/
+
+# Logs (reglas acotadas; no ignorar *.txt globalmente)
 logs/
+logs/*.txt
+temp/*.txt
+
+# Otros
+.env
 .gradio/
-*.txt
+
+# modelo.keras se versiona como artefacto de release; migrar a Git LFS o registry cuando supere ~5 MB.

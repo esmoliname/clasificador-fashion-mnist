@@ -1,0 +1,24 @@
+[project]
+name = "clasificador-fashion-mnist"
+version = "0.1.0"
+description = "Fashion MNIST image classifier with a hardened FastAPI inference service."
+requires-python = ">=3.11,<3.14"
+
+[tool.black]
+line-length = 88
+target-version = ["py312"]
+
+[tool.mypy]
+# Target 3.12: numpy 2.x usa la sintaxis `type` (PEP 695) en sus stubs, no parseable como 3.11.
+python_version = "3.12"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["tensorflow.*", "PIL.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-ra"

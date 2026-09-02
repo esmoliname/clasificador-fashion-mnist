@@ -1,13 +1,7 @@
-fastapi==0.104.1
+# Framework (bump: 0.104.1 de 2023 no compatibiliza TestClient con httpx 0.28 en Python 3.13)
+fastapi==0.115.12
 uvicorn==0.24.0
 python-multipart==0.0.6
-Pillow==10.1.0
+# Pillow 10.1.0 no tiene wheels para CPython 3.13; 12.3.0 es la actualización que propone Dependabot
+Pillow==12.3.0
 tensorflow==2.21.0
-tensorflow-datasets==4.9.4
-matplotlib==3.10.3
-pre-commit==4.2.0
-bandit==1.8.3
-black==24.10.0
-flake8==7.1.1
-mypy==1.15.0
-pylint==3.3.7
