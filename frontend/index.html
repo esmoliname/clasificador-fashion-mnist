@@ -5,14 +5,36 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Tensor Analysis Dashboard — Fashion MNIST</title>
 
-  <!-- Tailwind CSS (Play CDN) -->
+  <!--
+    ADVERTENCIA (Tailwind Play CDN) — SOLO PARA DESARROLLO.
+    Este CDN NO envía cabeceras CORS (Access-Control-Allow-Origin), por lo que
+    NO es compatible con subresource integrity (integrity="sha384-...") ni con
+    crossorigin="anonymous": aplicarlos haría que el navegador bloquee la carga
+    del script. Además, su contenido es un loader que flota con cada versión de
+    Tailwind, sin build minificado estable.
+    En PRODUCCIÓN se debe COMPILAR el CSS estáticamente (Tailwind CLI / PostCSS)
+    y servirlo desde el propio dominio con hash SRI real.
+    https://tailwindcss.com/docs/installation/play-cdn
+  -->
   <script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Vue 3 (Global Build) -->
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <!-- Vue 3 (Global Build) — SRI sha384 real calculado sobre vue.global.prod.js
+       NOTA: la URL vue@3 flota en la última 3.x publicada por unpkg; si se
+       publica una nueva versión menor el hash dejará de coincidir. Para fijar
+       el integrity de forma permanente, pinnea la versión exacta
+       (p. ej. vue@3.4.x) y recalcula el hash. -->
+  <script
+    src="https://unpkg.com/vue@3/dist/vue.global.prod.js"
+    integrity="sha384-bqTg8NKlUS8kbe8Sak41ZAg1OAW/cc4kyI+FqMhCpzsyG7B39KgZfDOKA3HnKhCV"
+    crossorigin="anonymous"
+  ></script>
 
-  <!-- Axios -->
-  <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+  <!-- Axios 1.6.0 (versión fijada) — SRI sha384 real calculado sobre axios.min.js -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"
+    integrity="sha384-VekiXfVDZuqx75T/YaGfn7/p6+e+D0f/G8UoZ5GBOCMZ89kMW4wTo8PSn6GSzOEl"
+    crossorigin="anonymous"
+  ></script>
 
   <script>
     tailwind.config = {
@@ -141,14 +163,14 @@
             <h1 class="font-display text-lg sm:text-xl font-bold text-white tracking-tight">
               TENSOR ANALYSIS <span class="text-cyan-400">DASHBOARD</span>
             </h1>
-            <p class="font-mono text-[11px] text-slate-500">fashion-mnist / mlp-784-50-50-10</p>
+            <p class="font-mono text-[11px] text-slate-500">fashion-mnist / mlp-784-128-10 · dropout 0.2</p>
           </div>
         </div>
 
         <div class="flex items-center gap-2 font-mono text-[11px]">
-          <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-emerald-400/20 bg-emerald-400/5">
+          <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-emerald-400/20 bg-emerald-400/5" :title="'endpoint activo: ' + API_ACTUAL">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span class="text-emerald-400">API // localhost:10000</span>
+            <span class="text-emerald-400 max-w-[240px] truncate">API // {{ API_ACTUAL }}</span>
           </span>
           <span class="px-3 py-1.5 rounded-md border border-slate-800 text-slate-400 hidden sm:inline-block">MODEL: MLP</span>
         </div>
@@ -312,15 +334,32 @@
     <!-- Footer -->
     <footer class="mt-10 text-center font-mono text-[10px] text-slate-700">
       <p>tensorflow · keras · fastapi · vue3 · tailwind</p>
-      <p class="mt-1">inferencia local — http://localhost:10000/predict</p>
+      <p class="mt-1">inferencia local — <span class="text-slate-500">{{ API_ACTUAL }}</span></p>
     </footer>
   </div>
 
   <script>
     const { createApp, ref, computed, defineComponent } = Vue;
 
-    // ── Constantes del entorno ─────────────────────────────────────
-    const API_URL = 'http://localhost:10000/predict';
+    // ── Resolución dinámica del endpoint (prioridad): ─────────────
+    // 1) query param  ?api=<url>
+    // 2) mismo origen si el frontend se sirve desde un host real (Vercel/proxy)
+    // 3) valor guardado en localStorage (ajustable desde la consola del navegador)
+    // 4) fallback localhost:10000 (desarrollo local)
+    function resolveApiUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const fromQuery = params.get('api');
+      const fromStorage = localStorage.getItem('fmnist_api_url');
+      const hostname = window.location.hostname;
+      const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '';
+      const sameOrigin = (!isLocal && window.location.origin)
+        ? window.location.origin + '/predict'
+        : null;
+      return fromQuery || sameOrigin || fromStorage || 'http://localhost:10000/predict';
+    }
+    const API_URL = resolveApiUrl();
+    // Endpoint activo, expuesto a la UI (header y footer).
+    const API_ACTUAL = API_URL;
 
     const PROCESANDO = [
       'Buffer de imagen recibido → canal RGB',
@@ -328,7 +367,7 @@
       'Normalizando píxeles a [0,1]…',
       'Calculando tensores de entrada…',
       'Extrayendo características (784 dims)…',
-      'Propagando MLP 50-50-10 (ReLU)…',
+      'Propagando MLP 784→128 (ReLU) + Dropout 0.2…',
       'Aplicando softmax en la capa de salida…',
       'Consolidando distribuciones…',
     ];
@@ -472,9 +511,14 @@
             const { data } = await axios.post(API_URL, formData, {
               headers: { 'Content-Type': 'multipart/form-data' },
             });
-            resultados.value = data.resultados.slice(0, 3);
+            // Contrato nuevo PredictResponse: resultados[] usa
+            // { class_id, class_name, confidence } — se mapea a la forma
+            // interna (clase/probabilidad) que consume el resto de la UI.
+            resultados.value = data.resultados
+              .slice(0, 3)
+              .map(r => ({ clase: r.class_name, probabilidad: r.confidence }));
             detenerProcesamiento();
-            log('ok', `Análisis completado → ${data.resultados[0]?.clase ?? 'desconocido'} @ ${(data.resultados[0]?.probabilidad * 100).toFixed(2)}%`);
+            log('ok', `Análisis completado → ${data.resultados[0]?.class_name ?? 'desconocido'} @ ${(data.resultados[0]?.confidence * 100).toFixed(2)}%`);
           } catch (e) {
             detenerProcesamiento();
             error.value = e.response?.data?.detail
@@ -486,6 +530,7 @@
         }
 
         return {
+          API_ACTUAL,
           imagen, previewURL, cargando, resultados, error, dragging, telemetry, fileInput,
           formato, tamaño, prediccionPrincipal, confianza,
           abrirSelector, manejarArchivo, manejarDrop, limpiarImagen, predecir,
